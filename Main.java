@@ -53,10 +53,11 @@ public class Main {
     }
 
     public  static class ThreadPoolTaskExecutorTest implements TaskExecutor{
-        Semaphore semaphore = new Semaphore(2);
+        private final ConcurrentHashMap<TaskGroup, Semaphore> groupLocks;
         private final ExecutorService executorService;
 
-        public ThreadPoolTaskExecutorTest(int poolSize ) {
+        public ThreadPoolTaskExecutorTest( int poolSize ) {
+            this.groupLocks = new ConcurrentHashMap<>();
             this.executorService = Executors.newFixedThreadPool(poolSize);
         }
 
@@ -66,6 +67,7 @@ public class Main {
                 throw new IllegalArgumentException("Task must not be null");
             }
             return executorService.submit(() -> {
+                Semaphore semaphore = groupLocks.computeIfAbsent(task.taskGroup, group -> new Semaphore(1));
                 try {
                     semaphore.acquire();
                     Thread.sleep(1000);
@@ -93,14 +95,14 @@ public class Main {
         // Create and submit tasks
         Task<String> task1 = new Task<>(
                 UUID.randomUUID(),
-                taskGroup,
+                new TaskGroup(UUID.randomUUID()), // concurrent execution due to different group
                 TaskType.READ,
                 () -> "Task 1 completed"
         );
 
         Task<Integer> task2 = new Task<>(
                 UUID.randomUUID(),
-                taskGroup,
+                new TaskGroup(UUID.randomUUID()),  // concurrent execution due to different group
                 TaskType.WRITE,
                 () -> {
                    // Thread.sleep(1000); // Simulate some computation
@@ -110,19 +112,19 @@ public class Main {
 
         Task<String> task3 = new Task<>(
                 UUID.randomUUID(),
-                taskGroup,
+                taskGroup,  
                 TaskType.READ,
                 () -> "Task 3 completed"
         );
         Task<String> task4 = new Task<>(
-                UUID.randomUUID(),
+                UUID.randomUUID(),   // non-concurrent execution due to same group
                 taskGroup,
                 TaskType.READ,
                 () -> "Task 4 completed"
         );
         Task<String> task5 = new Task<>(
                 UUID.randomUUID(),
-                taskGroup,
+                taskGroup,            // non-concurrent execution due to same group
                 TaskType.READ,
                 () -> "Task 5 completed"
         );
